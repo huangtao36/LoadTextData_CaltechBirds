@@ -7,7 +7,7 @@ Two Method For Load Text Data， load Caltech200_Birds dataset as an example.
 这个方法需要先统计所有文本，构建自己的词库，
 输出的是文本是对应词库位置的'编号'， 以 0 作为 padding 项统一句子长度。 
 
-> run `vocab_util.py` to build your vocabulary
+> run `vocab_util.py` to build your vocabulary  
 > run `dataloader.py` to load the caltech_birds datasets
 
 对应的方法： attnGAN
