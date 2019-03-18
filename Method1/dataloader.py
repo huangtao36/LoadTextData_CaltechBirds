@@ -88,16 +88,16 @@ class CaltechBirds(data.Dataset):
             caption.append(self.vocab('<end>'))
 
             num_words = len(caption)
-            x = np.zeros((self.max_word_length, 1), dtype='int64')
+            x = np.zeros((self.max_word_length), dtype='int64')
             x_len = num_words
             if num_words <= self.max_word_length:
-                x[:num_words, 0] = caption
+                x[:num_words] = caption
             else:
                 ix = list(np.arange(num_words))  # 1, 2, 3,..., maxNum
                 np.random.shuffle(ix)
                 ix = ix[:self.max_word_length]
                 ix = np.sort(ix)
-                x[:, 0] = [caption[idx] for idx in ix]
+                x = [caption[idx] for idx in ix]
                 x_len = self.max_word_length
 
             output.append(torch.Tensor(x))
@@ -123,6 +123,7 @@ class CaltechBirds(data.Dataset):
         if img.size(0) == 1:
             img = img.repeat(3, 1, 1)
         desc = datum['desc']
+        print(desc.shape)
         len_desc = datum['len_desc']
         # randomly select one sentence
         selected = np.random.choice(desc.size(0))
@@ -131,7 +132,7 @@ class CaltechBirds(data.Dataset):
         return img, desc, len_desc, file_name
 
 
-def get_loader(root, caption_root, vocab, split, img_transfrom,
+def get_loader(root, caption_root, vocab, max_word_length, split, img_transfrom,
                batch_size=1, shuffle=True, num_workers=4):
     classes_fllename = 'trainvalclasses.txt' \
         if split.lower() is 'train' else 'testclasses.txt'
@@ -140,7 +141,7 @@ def get_loader(root, caption_root, vocab, split, img_transfrom,
         img_root=root,
         caption_root=caption_root,
         classes_fllename=classes_fllename,
-        max_word_length=25,
+        max_word_length=max_word_length,
         vocab=vocab,
         img_transform=img_transfrom)
 
