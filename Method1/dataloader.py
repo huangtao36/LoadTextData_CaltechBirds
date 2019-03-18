@@ -36,20 +36,12 @@ def split_sentence_into_words(sentence):
     return tokenizer.tokenize(sentence.lower())
 
 
-def nums2chars(nums):
-    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
-
-    chars = ''
-    for num in nums:
-        chars += alphabet[num - 1]
-    return chars
-
-
 class CaltechBirds(data.Dataset):
     def __init__(self, img_root, caption_root,
                  classes_fllename, max_word_length,
                  vocab, img_transform=None):
         super(CaltechBirds, self).__init__()
+        self.alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 
         self.vocab = vocab
         self.max_word_length = max_word_length
@@ -58,7 +50,8 @@ class CaltechBirds(data.Dataset):
         if self.img_transform == None:
             self.img_transform = transforms.ToTensor()
 
-        self.data = self._load_dataset(img_root, caption_root, classes_fllename)
+        self.data = self._load_dataset(
+            img_root, caption_root, classes_fllename)
         print("Load dataset size: ", len(self.data))
 
     def _load_dataset(self, img_root, caption_root, classes_filename):
@@ -82,37 +75,50 @@ class CaltechBirds(data.Dataset):
 
     def _get_word_vectors(self, desc):
         len_desc = []
+
         output = []
 
         for i in range(desc.shape[1]):
-            sentence = nums2chars(desc[:, i])  # sentence
+            sentence = self._nums2chars(desc[:, i])  # sentence
             tokens = split_sentence_into_words(sentence)  # word
 
             caption = []
             caption.append(self.vocab('<start>'))
             caption.extend([self.vocab(token) for token in tokens])
             caption.append(self.vocab('<end>'))
-            cap_tensor = torch.Tensor(caption)
 
-            # zero padding to max_word_length
-            if len(caption) < self.max_word_length:  # 50
-                cap_tensor = torch.cat((
-                    cap_tensor,
-                    torch.zeros(self.max_word_length - len(tokens))
-                ))
+            num_words = len(caption)
+            x = np.zeros((self.max_word_length, 1), dtype='int64')
+            x_len = num_words
+            if num_words <= self.max_word_length:
+                x[:num_words, 0] = caption
+            else:
+                ix = list(np.arange(num_words))  # 1, 2, 3,..., maxNum
+                np.random.shuffle(ix)
+                ix = ix[:self.max_word_length]
+                ix = np.sort(ix)
+                x[:, 0] = [caption[idx] for idx in ix]
+                x_len = self.max_word_length
 
-            output.append(cap_tensor)
+            output.append(torch.Tensor(x))
 
-            len_desc.append(len(tokens))
+            len_desc.append(x_len)
 
         return torch.stack(output), len_desc
+
+    def _nums2chars(self, nums):
+        chars = ''
+        for num in nums:
+            chars += self.alphabet[num - 1]
+        return chars
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         datum = self.data[index]
-        img = Image.open(datum['img'])
+        file_name = datum['img']
+        img = Image.open(file_name)
         img = self.img_transform(img)
         if img.size(0) == 1:
             img = img.repeat(3, 1, 1)
@@ -122,11 +128,11 @@ class CaltechBirds(data.Dataset):
         selected = np.random.choice(desc.size(0))
         desc = desc[selected, ...]
         len_desc = len_desc[selected]
-        return img, desc, len_desc
+        return img, desc, len_desc, file_name
 
 
 def get_loader(root, caption_root, vocab, split, img_transfrom,
-               batch_size, shuffle, num_workers):
+               batch_size=1, shuffle=True, num_workers=4):
     classes_fllename = 'trainvalclasses.txt' \
         if split.lower() is 'train' else 'testclasses.txt'
 
@@ -134,7 +140,7 @@ def get_loader(root, caption_root, vocab, split, img_transfrom,
         img_root=root,
         caption_root=caption_root,
         classes_fllename=classes_fllename,
-        max_word_length=50,
+        max_word_length=25,
         vocab=vocab,
         img_transform=img_transfrom)
 
@@ -146,7 +152,6 @@ def get_loader(root, caption_root, vocab, split, img_transfrom,
     )
 
     return dataloader
-
 
 
 if __name__ == '__main__':
@@ -178,8 +183,8 @@ if __name__ == '__main__':
         num_workers=4
     )
 
-    for i, (images, targets, lengths) in enumerate(data_loader):
+    for i, (images, targets, lengths, file_name) in enumerate(data_loader):
         print(images.shape)
-        print(targets.shape)
+        print(targets)
         print(lengths)
         break
